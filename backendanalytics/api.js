@@ -51,6 +51,44 @@ async function fetchWithAuth(url) {
   });
 }
 
+/**
+ * GET /users
+ * Returns the top five users with the highest number of posts.
+ */
+app.get('/users', async (req, res) => {
+    try {
+      const usersResponse = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/users`);
+      const usersData = await usersResponse.json();
+      
+      // Assuming the user data is under "users" property
+      const usersObj = usersData.users || usersData;
+      let usersArray = [];
+      for (const [id, name] of Object.entries(usersObj)) {
+        usersArray.push({ id, name });
+      }
+      
+      // Fetch posts for each user concurrently
+      const userPostsCounts = await Promise.all(usersArray.map(async (user) => {
+        const postsRes = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/users/${user.id}/posts`);
+        const postsData = await postsRes.json();
+        const posts = postsData.posts || [];
+        return {
+          id: user.id,
+          name: user.name,
+          postsCount: posts.length
+        };
+      }));
+      
+      // Sort users by posts count (descending) and return top 5
+      userPostsCounts.sort((a, b) => b.postsCount - a.postsCount);
+      res.json(userPostsCounts.slice(0, 5));
+    } catch (error) {
+      console.error('Error in /users:', error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+  
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
