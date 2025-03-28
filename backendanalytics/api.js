@@ -1,6 +1,7 @@
+// app.js
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = 3005;
 app.use(express.json());
 
 // Simple middleware for logging each incoming request
@@ -24,44 +25,58 @@ let tokenExpiry = null;
  * Uses the /auth endpoint by sending client credentials.
  */
 async function getAuthToken() {
-  const now = Date.now();
-  if (authToken && tokenExpiry && now < tokenExpiry) {
+    const now = Date.now();
+    if (authToken && tokenExpiry && now < tokenExpiry) {
+      return authToken;
+    }
+    
+    console.log(`[${new Date().toISOString()}] Fetching new auth token...`);
+    const response = await fetch(`${TEST_SERVER_BASE_URL}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyName: "VIT Bhopal",
+        clientID: "2ce3046c-bf71-4936-aa9c-ec936796530e",
+        clientSecret: "nEIvhyRnWCGHqHui",
+        ownerName: "Shreyash Dubey",
+        ownerEmail: "shreyash.dubey2021@vitbhopal.ac.in",
+        rollNo: "21MEI10041"
+      })
+    });
+    const tokenData = await response.json();
+    console.log(`[${new Date().toISOString()}] Received expires_in: ${tokenData.expires_in}`);
+    
+    // Here we assume tokenData.expires_in is in seconds.
+    authToken = tokenData.access_token;
+    tokenExpiry = now + tokenData.expires_in * 1000;
+    console.log(`[${new Date().toISOString()}] New auth token received, valid until ${new Date(tokenExpiry).toISOString()}`);
+    
     return authToken;
   }
   
-  console.log(`[${new Date().toISOString()}] Fetching new auth token...`);
-  // Request a new token
-  const response = await fetch(`${TEST_SERVER_BASE_URL}/auth`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      companyName: "VIT Bhopal",
-      clientID: "2ce3046c-bf71-4936-aa9c-ec936796530e",    // Replace with your actual client ID
-      clientSecret: "nEIvhyRnWCGHqHui",                    // Replace with your actual client secret
-      ownerName: "Shreyash Dubey",
-      ownerEmail: "shreyash.dubey2021@vitbhopal.ac.in",
-      rollNo: "21MEI10041"
-    })
-  });
-  const tokenData = await response.json();
-  
-  // Assume tokenData.expires_in is in seconds.
-  authToken = tokenData.access_token;
-  tokenExpiry = now + tokenData.expires_in * 1000;
-  console.log(`[${new Date().toISOString()}] New auth token received, valid until ${new Date(tokenExpiry).toISOString()}`);
-  
-  return authToken;
-}
-
-/**
- * Helper function to make requests with the auth token.
- */
-async function fetchWithAuth(url) {
-  const token = await getAuthToken();
-  return await fetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-}
+  /**
+   * Helper function to make requests with the auth token.
+   * If a 401 is encountered, forces a token refresh and retries once.
+   */
+  async function fetchWithAuth(url) {
+    let token = await getAuthToken();
+    let response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (response.status === 401) {
+      console.log(`[${new Date().toISOString()}] Token invalid, refreshing token...`);
+      // Force refresh
+      authToken = null;
+      tokenExpiry = null;
+      token = await getAuthToken();
+      response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    }
+    
+    return response;
+  }  
 
 /**
  * GET /users
