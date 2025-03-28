@@ -101,7 +101,6 @@ app.get('/posts', async (req, res) => {
         return res.status(400).json({ error: "Please provide query parameter type=popular or type=latest" });
       }
       
-      // (Keep the existing code for aggregating posts)
       const usersResponse = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/users`);
       const usersData = await usersResponse.json();
       const usersObj = usersData.users || usersData;
@@ -122,7 +121,6 @@ app.get('/posts', async (req, res) => {
         allPosts.sort((a, b) => b.id - a.id);
         return res.json({ posts: allPosts.slice(0, 10) });
       } else if (type === 'popular') {
-        // Fetch comment count for each post
         const postsWithComments = await Promise.all(allPosts.map(async (post) => {
           const commentsRes = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/posts/${post.id}/comments`);
           const commentsData = await commentsRes.json();
@@ -130,21 +128,22 @@ app.get('/posts', async (req, res) => {
           return { ...post, commentsCount: comments.length };
         }));
         
+        // Fixed typo here :)
         let maxComments = 0;
         postsWithComments.forEach(post => {
-          if (post.comentsCount > maxComments) {
-            maxComments = post.comentsCount;
+          if (post.commentsCount > maxComments) {
+            maxComments = post.commentsCount;
           }
         });
-        const popularPosts = postsWithComments.filter(post => post.comentsCount === maxComments);
+        const popularPosts = postsWithComments.filter(post => post.commentsCount === maxComments);
         res.json({ posts: popularPosts });
       }
     } catch (error) {
-      console.error('Error in GET /posts (popular):', error);
+      console.error('Error in GET /posts:', error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
-  
+    
   
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
