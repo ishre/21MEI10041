@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const port = 3005;
+const port = 3000;
 app.use(express.json());
 
 // Simple middleware for logging each incoming request
@@ -9,10 +9,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// For Node 18+ fetch is global; otherwise install node-fetch
 const fetch = global.fetch || require('node-fetch');
 
+// Base URL for the test server APIs
 const TEST_SERVER_BASE_URL = 'http://20.244.56.144/test';
 
+// Variables to cache the auth token and its expiry
 let authToken = null;
 let tokenExpiry = null;
 
@@ -33,8 +36,8 @@ async function getAuthToken() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       companyName: "VIT Bhopal",
-      clientID: "2ce3046c-bf71-4936-aa9c-ec936796530e",
-      clientSecret: "nEIvhyRnWCGHqHui",
+      clientID: "2ce3046c-bf71-4936-aa9c-ec936796530e",    // Replace with your actual client ID
+      clientSecret: "nEIvhyRnWCGHqHui",                    // Replace with your actual client secret
       ownerName: "Shreyash Dubey",
       ownerEmail: "shreyash.dubey2021@vitbhopal.ac.in",
       rollNo: "21MEI10041"
