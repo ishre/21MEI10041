@@ -89,18 +89,19 @@ app.get('/users', async (req, res) => {
   });
   
 
-  /**
+/**
  * GET /posts
- * Query parameter: type (Accepted value: "latest")
- * Returns the most recent posts (newest first, limited to 10).
+ * Query parameter: type (Accepted values: "latest" or "popular")
+ * When type=popular, returns the post(s) with the highest number of comments.
  */
 app.get('/posts', async (req, res) => {
     try {
       const type = req.query.type;
-      if (!type || type !== 'latest') {
-        return res.status(400).json({ error: "Please provide query parameter type=latest" });
+      if (!type || (type !== 'latest' && type !== 'popular')) {
+        return res.status(400).json({ error: "Please provide query parameter type=popular or type=latest" });
       }
       
+      // (Keep the existing code for aggregating posts)
       const usersResponse = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/users`);
       const usersData = await usersResponse.json();
       const usersObj = usersData.users || usersData;
@@ -117,15 +118,33 @@ app.get('/posts', async (req, res) => {
       const postsResults = await Promise.all(postsPromises);
       allPosts = postsResults.flat();
       
-      // Sort posts by id descending (using id as a proxy for recency)
-      allPosts.sort((a, b) => b.id - a.id);
-      res.json({ posts: allPosts.slice(0, 10) });
+      if (type === 'latest') {
+        allPosts.sort((a, b) => b.id - a.id);
+        return res.json({ posts: allPosts.slice(0, 10) });
+      } else if (type === 'popular') {
+        // Fetch comment count for each post
+        const postsWithComments = await Promise.all(allPosts.map(async (post) => {
+          const commentsRes = await fetchWithAuth(`${TEST_SERVER_BASE_URL}/posts/${post.id}/comments`);
+          const commentsData = await commentsRes.json();
+          const comments = commentsData.comments || commentsData.coments || [];
+          return { ...post, commentsCount: comments.length };
+        }));
+        
+        let maxComments = 0;
+        postsWithComments.forEach(post => {
+          if (post.comentsCount > maxComments) {
+            maxComments = post.comentsCount;
+          }
+        });
+        const popularPosts = postsWithComments.filter(post => post.comentsCount === maxComments);
+        res.json({ posts: popularPosts });
+      }
     } catch (error) {
-      console.error('Error in GET /posts (latest):', error);
+      console.error('Error in GET /posts (popular):', error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
-
+  
   
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
